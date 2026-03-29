@@ -1,0 +1,246 @@
+---
+name: Build container image
+on:
+  schedule:
+    - cron: '40 4 * * *'  # Daily at 04:40 UTC (before promote at 10:05)
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Containerfile'
+      - 'build_files/**'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Containerfile'
+      - 'build_files/**'
+  workflow_dispatch:
+    inputs:
+      target_channel:
+        description: 'Target channel (testing = normal, latest/stable = emergency promote)'
+        required: false
+        default: 'testing'
+        type: choice
+        options:
+          - testing
+          - latest
+          - stable
+
+env:
+  IMAGE_DESC: "A COSMIC desktop experience for ARM/aarch64 with FEX-Emu gaming"
+  IMAGE_KEYWORDS: "bootc,cosmic,razorfin,arm,aarch64,fex-emu,gaming"
+  IMAGE_LOGO_URL: "https://raw.githubusercontent.com/RazorfinOS-org/Razorfin-ARM/main/assets/logo.png"
+  IMAGE_NAME: "${{ github.event.repository.name }}"
+  IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
+  DEFAULT_TAG: "testing"
+  BASE_IMAGE: "quay.io/fedora-ostree-desktops/cosmic-atomic:43"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Check for upstream changes
+    runs-on: ubuntu-24.04
+    outputs:
+      should_build: ${{ steps.check.outputs.should_build }}
+    steps:
+      - name: Prepare environment
+        run: |
+          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+
+      - name: Check for upstream changes
+        id: check
+        run: |
+          # Always build for non-schedule events
+          if [[ "${{ github.event_name }}" != "schedule" ]]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # For scheduled runs, check if the base image has changed
+          BASE="${{ env.BASE_IMAGE }}"
+          SUFFIXES=("" "-dx")
+
+          for suffix in "${SUFFIXES[@]}"; do
+            OUR_IMAGE="${IMAGE_REGISTRY}/${IMAGE_NAME}${suffix}:testing"
+
+            BASE_DIGEST=$(skopeo inspect --format '{{.Digest}}' "docker://${BASE}" 2>/dev/null || echo "unknown")
+            CURRENT_BASE=$(skopeo inspect --format '{{index .Labels "org.opencontainers.image.base.digest"}}' "docker://${OUR_IMAGE}" 2>/dev/null || echo "")
+
+            echo "Checking ${suffix:-base}: upstream=${BASE_DIGEST:0:20}... current=${CURRENT_BASE:0:20}..."
+
+            if [[ "$BASE_DIGEST" != "$CURRENT_BASE" ]]; then
+              echo "Upstream change detected for ${suffix:-base}"
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+
+          echo "No upstream changes detected"
+          echo "should_build=false" >> "$GITHUB_OUTPUT"
+
+  build_push:
+    name: Build and push image (${{ matrix.variant.name }})
+    needs: [check]
+    if: needs.check.outputs.should_build == 'true'
+    runs-on: ubuntu-24.04-arm
+
+    strategy:
+      fail-fast: false
+      matrix:
+        variant:
+          - name: razorfin-arm
+            suffix: ""
+            dx_variant: "false"
+            board_target: "generic"
+          - name: razorfin-arm-dx
+            suffix: "-dx"
+            dx_variant: "true"
+            board_target: "generic"
+
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Prepare environment
+        run: |
+          echo "IMAGE_REGISTRY=${IMAGE_REGISTRY,,}" >> "${GITHUB_ENV}"
+          echo "IMAGE_NAME=${IMAGE_NAME,,}" >> "${GITHUB_ENV}"
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Maximize build space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo apt-get clean
+          df -h
+
+      - name: Get current date
+        id: date
+        run: |
+          echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+          echo "tag=$(date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+
+      - name: Get base image digest
+        id: base
+        run: |
+          BASE_DIGEST=$(skopeo inspect --format '{{.Digest}}' "docker://${{ env.BASE_IMAGE }}")
+          echo "digest=${BASE_DIGEST}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate image metadata
+        id: metadata
+        run: |
+          VERSION_TAG="${{ env.DEFAULT_TAG }}.$(date +%Y%m%d)"
+          echo "version=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+
+          ALIAS_TAGS="${{ env.DEFAULT_TAG }} ${VERSION_TAG} ${{ steps.date.outputs.tag }}"
+          echo "alias_tags=${ALIAS_TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        run: |
+          sudo buildah build \
+            --build-arg BASE_IMAGE=${{ env.BASE_IMAGE }} \
+            --build-arg BOARD_TARGET=${{ matrix.variant.board_target }} \
+            --build-arg DX_VARIANT=${{ matrix.variant.dx_variant }} \
+            --tag raw-img \
+            .
+
+      - name: Login to GitHub Container Registry
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u ${{ github.actor }} --password-stdin
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo skopeo login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Tag and push image
+        id: push
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          IMAGE="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.variant.suffix }}"
+
+          # Add OCI labels to the image
+          sudo buildah config \
+            --label "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md" \
+            --label "org.opencontainers.image.created=${{ steps.date.outputs.date }}" \
+            --label "org.opencontainers.image.description=${{ env.IMAGE_DESC }}" \
+            --label "org.opencontainers.image.documentation=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md" \
+            --label "org.opencontainers.image.source=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/blob/${{ github.sha }}/Containerfile" \
+            --label "org.opencontainers.image.title=${{ env.IMAGE_NAME }}" \
+            --label "org.opencontainers.image.url=https://github.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/tree/${{ github.sha }}" \
+            --label "org.opencontainers.image.vendor=${{ github.repository_owner }}" \
+            --label "org.opencontainers.image.version=${{ steps.metadata.outputs.version }}" \
+            --label "io.artifacthub.package.deprecated=false" \
+            --label "io.artifacthub.package.keywords=${{ env.IMAGE_KEYWORDS }}" \
+            --label "io.artifacthub.package.license=Apache-2.0" \
+            --label "io.artifacthub.package.logo-url=${{ env.IMAGE_LOGO_URL }}" \
+            --label "io.artifacthub.package.prerelease=false" \
+            --label "containers.bootc=1" \
+            --label "org.opencontainers.image.base.digest=${{ steps.base.outputs.digest }}" \
+            --label "org.opencontainers.image.base.name=${{ env.BASE_IMAGE }}" \
+            raw-img
+
+          sudo buildah commit raw-img "${IMAGE}:${{ env.DEFAULT_TAG }}"
+
+          # Push with each tag
+          for tag in ${{ steps.metadata.outputs.alias_tags }}; do
+            sudo buildah push "${IMAGE}:${{ env.DEFAULT_TAG }}" "docker://${IMAGE}:${tag}"
+          done
+
+          # Capture the digest for signing
+          DIGEST=$(sudo skopeo inspect --format '{{.Digest}}' "docker://${IMAGE}:${{ env.DEFAULT_TAG }}")
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@faadad0cce49287aee09b3a48701e75088a2c6ad # v4.0.0
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        with:
+          cosign-release: 'v2.6.1'
+
+      - name: Sign container image
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          cosign sign -y --key env://COSIGN_PRIVATE_KEY \
+            "${{ steps.push.outputs.image }}@${{ steps.push.outputs.digest }}"
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+
+      - name: Emergency promote to latest
+        if: >-
+          github.event_name != 'pull_request' &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+          (inputs.target_channel == 'latest' || inputs.target_channel == 'stable')
+        run: |
+          IMAGE="${{ steps.push.outputs.image }}"
+          DATE_TAG=$(date +%Y%m%d)
+
+          sudo skopeo copy "docker://${IMAGE}:${{ env.DEFAULT_TAG }}" "docker://${IMAGE}:latest"
+          sudo skopeo copy "docker://${IMAGE}:${{ env.DEFAULT_TAG }}" "docker://${IMAGE}:latest.${DATE_TAG}"
+
+          cosign sign -y --key env://COSIGN_PRIVATE_KEY \
+            "${IMAGE}@${{ steps.push.outputs.digest }}"
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+
+      - name: Emergency promote to stable
+        if: >-
+          github.event_name != 'pull_request' &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+          inputs.target_channel == 'stable'
+        run: |
+          IMAGE="${{ steps.push.outputs.image }}"
+          DATE_TAG=$(date +%Y%m%d)
+
+          sudo skopeo copy "docker://${IMAGE}:${{ env.DEFAULT_TAG }}" "docker://${IMAGE}:stable"
+          sudo skopeo copy "docker://${IMAGE}:${{ env.DEFAULT_TAG }}" "docker://${IMAGE}:stable.${DATE_TAG}"
+
+          cosign sign -y --key env://COSIGN_PRIVATE_KEY \
+            "${IMAGE}@${{ steps.push.outputs.digest }}"
+        env:
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}

@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+# Razorfin fastfetch aliases
+alias neofetch='/usr/bin/fastfetch -c /usr/share/ublue-os/razorfin/fastfetch.jsonc'
+alias neowofetch='/usr/bin/fastfetch -c /usr/share/ublue-os/razorfin/fastfetch.jsonc'
+alias fastfetch='/usr/bin/fastfetch -c /usr/share/ublue-os/razorfin/fastfetch.jsonc'

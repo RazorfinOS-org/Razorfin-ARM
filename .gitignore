@@ -1,0 +1,29 @@
+# Secrets
+cosign.key
+*.env
+
+# Build artifacts
+_build_*
+_build-*/**
+output/
+previous.manifest.json
+changelog.md
+output.env
+
+# Disk images
+*.qcow2
+*.raw
+*.iso
+*.img
+*.vmdk
+
+# VM artifacts
+test-vm.sh
+vm-serial.log
+vm-monitor.sock
+
+# Tooling
+.titanoboa/
+
+# macOS
+.DS_Store
