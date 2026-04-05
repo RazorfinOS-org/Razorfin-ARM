@@ -166,7 +166,10 @@ jobs:
         run: |
           IMAGE="${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.variant.suffix }}"
 
-          # Add OCI labels to the image
+          # Create a working container from the built image
+          CONTAINER=$(sudo buildah from raw-img)
+
+          # Add OCI labels to the container
           sudo buildah config \
             --label "io.artifacthub.package.readme-url=https://raw.githubusercontent.com/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}/${{ github.sha }}/README.md" \
             --label "org.opencontainers.image.created=${{ steps.date.outputs.date }}" \
@@ -185,9 +188,9 @@ jobs:
             --label "containers.bootc=1" \
             --label "org.opencontainers.image.base.digest=${{ steps.base.outputs.digest }}" \
             --label "org.opencontainers.image.base.name=${{ env.BASE_IMAGE }}" \
-            raw-img
+            "$CONTAINER"
 
-          sudo buildah commit raw-img "${IMAGE}:${{ env.DEFAULT_TAG }}"
+          sudo buildah commit "$CONTAINER" "${IMAGE}:${{ env.DEFAULT_TAG }}"
 
           # Push with each tag
           for tag in ${{ steps.metadata.outputs.alias_tags }}; do
