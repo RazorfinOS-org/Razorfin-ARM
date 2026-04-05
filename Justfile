@@ -15,7 +15,7 @@ default:
 # Check Just Syntax
 [group('Just')]
 check:
-    #!/usr/bin/bash
+    #!/usr/bin/env bash
     find . -type f -name "*.just" | while read -r file; do
     	echo "Checking syntax: $file"
     	just --unstable --fmt --check -f $file
@@ -26,7 +26,7 @@ check:
 # Fix Just Syntax
 [group('Just')]
 fix:
-    #!/usr/bin/bash
+    #!/usr/bin/env bash
     find . -type f -name "*.just" | while read -r file; do
     	echo "Checking syntax: $file"
     	just --unstable --fmt -f $file
@@ -37,7 +37,7 @@ fix:
 # Clean Repo
 [group('Utility')]
 clean:
-    #!/usr/bin/bash
+    #!/usr/bin/env bash
     set -eoux pipefail
     touch _build
     find *_build* -exec rm -rf {} \;
@@ -45,6 +45,14 @@ clean:
     rm -f changelog.md
     rm -f output.env
     rm -f output/
+
+# Clean only UTM bundles
+[group('Utility')]
+clean-utm:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    rm -rf output/qcow2/Razorfin-ARM.utm
+    echo "UTM bundles cleaned."
 
 # Sudo Clean Repo
 [group('Utility')]
@@ -56,7 +64,7 @@ sudo-clean:
 [group('Utility')]
 [private]
 sudoif command *args:
-    #!/usr/bin/bash
+    #!/usr/bin/env bash
     function sudoif(){
         if [[ "${UID}" -eq 0 ]]; then
             "$@"
@@ -78,6 +86,7 @@ sudoif command *args:
 #   $base_image - The base image to use (default: $default_base_image)
 #   $board_target - The board target (default: $default_board_target)
 #
+
 # Example: just build razorfin-arm latest
 build $target_image=image_name $tag=default_tag $base_image=default_base_image $board_target=default_board_target:
     #!/usr/bin/env bash
@@ -149,7 +158,7 @@ build-rockchip $target_image=("localhost/" + image_name + "-rockchip") $tag=defa
 
 # Load image into rootful podman
 _rootful_load_image $target_image=image_name $tag=default_tag:
-    #!/usr/bin/bash
+    #!/usr/bin/env bash
     set -eoux pipefail
 
     if [[ -n "${SUDO_USER:-}" || "${UID}" -eq "0" ]]; then
@@ -177,6 +186,7 @@ _rootful_load_image $target_image=image_name $tag=default_tag:
 
 # Build a bootc bootable image using Bootc Image Builder (BIB)
 # On macOS (Podman Machine), output must be under a host-mounted path.
+
 # On Linux, uses sudo for rootful podman access.
 _build-bib $target_image $tag $type $config:
     #!/usr/bin/env bash
@@ -259,9 +269,33 @@ rebuild-qcow2 $target_image=("localhost/" + image_name) $tag=default_tag: && (_r
 [group('Build Virtual Machine Image')]
 rebuild-raw $target_image=("localhost/" + image_name) $tag=default_tag: && (_rebuild-bib target_image tag "raw" "disk_config/disk.toml")
 
+# Build a UTM bundle from the QCOW2 image
+[group('Build Virtual Machine Image')]
+build-utm ram="8192" cpus="4":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    RAM="{{ ram }}" CPUS="{{ cpus }}" bash build_files/create-utm-bundle.sh
+
+# Rebuild container, QCOW2, and UTM bundle in one command
+[group('Build Virtual Machine Image')]
+rebuild-utm $target_image=("localhost/" + image_name) $tag=default_tag ram="8192" cpus="4": (build target_image tag) && (_build-bib target_image tag "qcow2" "disk_config/disk.toml") (build-utm ram cpus)
+
+# Open the UTM bundle in UTM
+[group('Run Virtual Machine')]
+open-utm:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    UTM_BUNDLE="$(pwd)/output/qcow2/Razorfin-ARM.utm"
+    if [[ ! -d "$UTM_BUNDLE" ]]; then
+        echo "ERROR: UTM bundle not found at $UTM_BUNDLE"
+        echo "Run 'just build-utm' or 'just rebuild-utm' first."
+        exit 1
+    fi
+    open "$UTM_BUNDLE"
+
 # Run a virtual machine with the specified image type and configuration
 _run-vm $target_image $tag $type $config:
-    #!/usr/bin/bash
+    #!/usr/bin/env bash
     set -eoux pipefail
 
     image_file="output/${type}/disk.${type}"

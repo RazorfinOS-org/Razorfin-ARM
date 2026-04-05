@@ -4,6 +4,7 @@ ARG DX_VARIANT="false"
 
 FROM scratch AS ctx
 COPY build_files /build
+COPY fex-appconfig/AppConfig /build/fex-appconfig
 
 FROM ${BASE_IMAGE}
 

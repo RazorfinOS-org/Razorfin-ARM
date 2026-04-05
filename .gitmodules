@@ -1,0 +1,3 @@
+[submodule "fex-appconfig"]
+	path = fex-appconfig
+	url = https://github.com/FEX-Emu/AppConfig.git

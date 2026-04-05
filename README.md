@@ -18,7 +18,10 @@ Razorfin ARM is an aarch64 port of [Razorfin](https://github.com/RazorfinOS-org/
 - **Steam** — Runs via FEX-Emu with the `razorfin-steam` launcher
 - **Mesa/Vulkan** — Native ARM64 GPU drivers
 - **Gaming tools** — Gamescope, MangoHud, GameMode (where available for aarch64)
+- **Performance tuning** — [Bazzite](https://bazzite.gg/)-matched sysctl values, FEX thunks, per-game [AppConfig](https://github.com/FEX-Emu/AppConfig) profiles
 - **Razorfin branding** — Custom Plymouth theme, fastfetch, MOTD
+
+> **Note:** Gamescope availability on aarch64 depends on Fedora packaging. If unavailable, it is automatically skipped during image build. Games will still run but without Gamescope's micro-compositor features.
 
 ## Hardware Requirements
 
@@ -69,6 +72,29 @@ FEXBash uname -m  # Should output: x86_64
 ```
 
 FEX-Emu thunks forward Vulkan and OpenGL calls to native ARM64 Mesa drivers, providing near-native GPU performance for games.
+
+## Performance Tuning
+
+Razorfin ARM ships with gaming-optimized kernel parameters matching [Bazzite](https://bazzite.gg/)'s production configuration:
+
+- **vm.max_map_count** raised for Proton/Wine compatibility
+- **ZRAM-optimized swappiness** for better memory management under gaming loads
+- **TCP BBR** congestion control for faster game downloads
+- **Memlock limits** raised for Proton shared memory regions
+- **FEX AppConfig** — 29 pre-tested per-game emulation profiles from [FEX-Emu/AppConfig](https://github.com/FEX-Emu/AppConfig)
+- **FEX ThunksDB** — Vulkan/OpenGL calls forwarded to native ARM64 Mesa by default
+
+### TSO Auto-Detection
+
+The `razorfin-steam` launcher automatically detects hardware TSO (Total Store Ordering) support:
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **LRCPC2** (FEAT_LRCPC2) | Best | Full hardware TSO — native x86 memory ordering |
+| **LRCPC** (v1) | Partial | Partial hardware acceleration |
+| None | Software | Software memory barriers (reduced performance) |
+
+Run `razorfin-steam` to see your TSO status at launch.
 
 ## Image Verification
 
@@ -121,6 +147,19 @@ just build-rockchip         # Rockchip variant (experimental)
 just build-qcow2            # Build QCOW2
 just run-vm-qcow2           # Build and run in a VM
 ```
+
+### UTM VM (macOS)
+
+Build a UTM-compatible `.utm` bundle that can be opened directly in [UTM](https://mac.getutm.app/):
+
+```bash
+just build-utm              # Build UTM bundle from existing QCOW2 (default: 8GB RAM, 4 CPUs)
+just build-utm ram=16384    # Build with 16GB RAM
+just rebuild-utm            # Rebuild container, QCOW2, and UTM bundle in one command
+just open-utm               # Open the UTM bundle in UTM
+```
+
+The resulting `output/qcow2/Razorfin-ARM.utm` bundle can be double-clicked to import into UTM, or shared with others.
 
 Run `just` with no arguments to see all available recipes.
 

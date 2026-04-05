@@ -1,0 +1,8 @@
+{
+  "Config": {
+    "RootFS": "/usr/share/fex-emu/RootFS/default.erofs",
+    "ThunkHostLibs": "/usr/lib64/fex-emu/HostThunks/",
+    "ThunkGuestLibs": "/usr/share/fex-emu/GuestThunks/",
+    "ThunkConfig": "/usr/share/fex-emu/ThunksDB.json"
+  }
+}
