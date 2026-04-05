@@ -2,6 +2,7 @@ export image_name := env("IMAGE_NAME", "razorfin-arm")
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
 export default_base_image := env("BASE_IMAGE", "quay.io/fedora-ostree-desktops/cosmic-atomic:43")
+export titanoboa_image := env("TITANOBOA_IMAGE", "ghcr.io/ublue-os/titanoboa:latest")
 export default_board_target := env("BOARD_TARGET", "generic")
 
 alias build-vm := build-qcow2
@@ -279,6 +280,94 @@ build-utm ram="8192" cpus="4":
 # Rebuild container, QCOW2, and UTM bundle in one command
 [group('Build Virtual Machine Image')]
 rebuild-utm $target_image=("localhost/" + image_name) $tag=default_tag ram="8192" cpus="4": (build target_image tag) && (_build-bib target_image tag "qcow2" "disk_config/disk.toml") (build-utm ram cpus)
+
+# Build an ISO using Titanoboa
+# Parameters:
+#   image_ref: The container image reference (ex. ghcr.io/razorfinos-org/razorfin-arm:latest)
+#   iso_name: The output ISO filename (ex. razorfin-arm-live-aarch64.iso)
+[private]
+_build-iso-titanoboa $image_ref $iso_name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "Building ISO for ${image_ref} using Titanoboa..."
+
+    # Clone titanoboa if not already present
+    if [[ ! -d ".titanoboa" ]]; then
+        git clone --depth 1 https://github.com/ublue-os/titanoboa.git .titanoboa
+    fi
+
+    sudo \
+        HOOK_post_rootfs="$(pwd)/iso_files/configure_iso.sh" \
+        $(which just) -f .titanoboa/Justfile build \
+        "${image_ref}" 1 none squashfs "" "" 1
+
+    sudo chown "$(id -u):$(id -g)" .titanoboa/output.iso
+    mkdir -p output
+    mv .titanoboa/output.iso "output/${iso_name}"
+
+    echo "ISO built: output/${iso_name}"
+
+# Build an ISO image (generic aarch64)
+[group('Build ISO')]
+build-iso $image_ref=("ghcr.io/razorfinos-org/" + image_name + ":latest"): (_build-iso-titanoboa image_ref (image_name + "-live-aarch64.iso"))
+
+# Build an ISO image for RPi5
+[group('Build ISO')]
+build-iso-rpi5 $image_ref=("ghcr.io/razorfinos-org/" + image_name + "-rpi5:latest"): (_build-iso-titanoboa image_ref (image_name + "-rpi5-live-aarch64.iso"))
+
+# Build an ISO image for Rockchip
+[group('Build ISO')]
+build-iso-rockchip $image_ref=("ghcr.io/razorfinos-org/" + image_name + "-rockchip:latest"): (_build-iso-titanoboa image_ref (image_name + "-rockchip-live-aarch64.iso"))
+
+# Run a virtual machine from an ISO
+[group('Run Virtual Machine')]
+run-vm-iso $iso_path="":
+    #!/usr/bin/env bash
+    set -eoux pipefail
+
+    # Find the ISO file
+    if [[ -n "${iso_path}" ]]; then
+        image_file="${iso_path}"
+    else
+        image_file=$(find output/ -name "*.iso" -type f | head -1)
+    fi
+
+    if [[ -z "${image_file}" || ! -f "${image_file}" ]]; then
+        echo "No ISO found. Run 'just build-iso' first."
+        exit 1
+    fi
+
+    # Find an available port (Linux first, macOS fallback)
+    port=8006
+    while ss -tunalp 2>/dev/null | grep -q ":${port} " || lsof -iTCP:${port} -sTCP:LISTEN &>/dev/null; do
+        port=$(( port + 1 ))
+    done
+    echo "Using Port: ${port}"
+    echo "Connect to http://localhost:${port}"
+
+    run_args=()
+    run_args+=(--rm --privileged)
+    run_args+=(--pull=newer)
+    run_args+=(--publish "127.0.0.1:${port}:8006")
+    run_args+=(--env "CPU_CORES=4")
+    run_args+=(--env "RAM_SIZE=8G")
+    run_args+=(--env "DISK_SIZE=64G")
+    run_args+=(--env "TPM=Y")
+    run_args+=(--env "GPU=Y")
+    if [[ -e /dev/kvm ]]; then
+        run_args+=(--device=/dev/kvm)
+    fi
+    run_args+=(--volume "${PWD}/${image_file}":"/boot.iso")
+    run_args+=(docker.io/qemux/qemu)
+
+    # Open browser (Linux first, macOS fallback)
+    OPEN_CMD="xdg-open"
+    if ! command -v xdg-open &>/dev/null && command -v open &>/dev/null; then
+        OPEN_CMD="open"
+    fi
+    (sleep 30 && ${OPEN_CMD} http://localhost:"$port") &
+    podman run "${run_args[@]}"
 
 # Open the UTM bundle in UTM
 [group('Run Virtual Machine')]
