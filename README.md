@@ -10,6 +10,8 @@ Razorfin ARM is an aarch64 port of [Razorfin](https://github.com/RazorfinOS-org/
 |---------|-------------|
 | `razorfin-arm` | COSMIC desktop + FEX-Emu gaming stack |
 | `razorfin-arm-dx` | COSMIC desktop + FEX-Emu gaming + developer tools |
+| `razorfin-arm-rpi5` | Raspberry Pi 5 (experimental) |
+| `razorfin-arm-rockchip` | Rockchip RK3588/RK3589 boards (experimental) |
 
 ## What's Included
 
@@ -52,6 +54,10 @@ sudo bootc switch --enforce-container-sigpolicy ghcr.io/razorfinos-org/razorfin-
 
 # DX variant
 sudo bootc switch --enforce-container-sigpolicy ghcr.io/razorfinos-org/razorfin-arm-dx:stable
+
+# Board-specific variants
+sudo bootc switch --enforce-container-sigpolicy ghcr.io/razorfinos-org/razorfin-arm-rpi5:stable
+sudo bootc switch --enforce-container-sigpolicy ghcr.io/razorfinos-org/razorfin-arm-rockchip:stable
 ```
 
 To track a different channel, replace `:stable` with `:latest` or `:testing`.
@@ -141,11 +147,22 @@ just build-rpi5             # Raspberry Pi 5 variant (experimental)
 just build-rockchip         # Rockchip variant (experimental)
 ```
 
-### QCOW2 VM Images
+### VM Images
 
 ```bash
-just build-qcow2            # Build QCOW2
-just run-vm-qcow2           # Build and run in a VM
+just build-qcow2            # Build QCOW2 image
+just build-raw              # Build RAW disk image
+just run-vm-qcow2           # Build and run QCOW2 in a VM
+just run-vm-raw             # Build and run RAW in a VM
+```
+
+### ISOs
+
+```bash
+just build-iso              # Generic aarch64 ISO
+just build-iso-rpi5         # Raspberry Pi 5 ISO
+just build-iso-rockchip     # Rockchip ISO
+just run-vm-iso             # Boot an ISO in a QEMU web VM
 ```
 
 ### UTM VM (macOS)
@@ -161,6 +178,15 @@ just open-utm               # Open the UTM bundle in UTM
 
 The resulting `output/qcow2/Razorfin-ARM.utm` bundle can be double-clicked to import into UTM, or shared with others.
 
+### Development
+
+```bash
+just lint                   # ShellCheck all Bash scripts
+just format                 # Format Bash scripts with shfmt
+just check                  # Check Just syntax
+just fix                    # Fix Just formatting
+```
+
 Run `just` with no arguments to see all available recipes.
 
 ## Differences from x86 Razorfin
@@ -171,7 +197,7 @@ Run `just` with no arguments to see all available recipes.
 | Architecture | x86_64 | aarch64 |
 | Gaming | Native x86 + Proton | FEX-Emu x86 translation + Proton |
 | NVIDIA variants | Yes | No (ARM NVIDIA is rare) |
-| ISOs | Monthly | Planned (container-only for v1) |
+| ISOs | Monthly | Planned |
 
 ## Contributing
 
