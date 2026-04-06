@@ -5,9 +5,9 @@
 |  Command | Description |
 | ------- | ----------- |
 | `fastfetch` | View system information |
-| `razorfin-steam` | Launch Steam via FEX-Emu |
-| `FEXBash` | Run any x86/x86-64 application |
 | `distrobox create` | Create a mutable container |
+| `razorfin-steam` | Launch Steam via FEX-Emu |
+| `FEXBash` | Run any x86/x86-64 binary |
 
 %TIP%
 - **󰊤** [Report an issue](https://github.com/RazorfinOS-org/Razorfin-ARM/issues)

@@ -284,11 +284,18 @@ rebuild-utm $target_image=("localhost/" + image_name) $tag=default_tag ram="8192
 # Build an ISO using Titanoboa
 # Parameters:
 #   image_ref: The container image reference (ex. ghcr.io/razorfinos-org/razorfin-arm:latest)
-#   iso_name: The output ISO filename (ex. razorfin-arm-live-aarch64.iso)
+
+# iso_name: The output ISO filename (ex. razorfin-arm-live-aarch64.iso)
 [private]
 _build-iso-titanoboa $image_ref $iso_name:
     #!/usr/bin/env bash
     set -euo pipefail
+
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "ERROR: ISO builds require Linux (GNU tar, chroot, mount)."
+        echo "Use the build-iso GitHub Actions workflow or run in a Linux VM."
+        exit 1
+    fi
 
     echo "Building ISO for ${image_ref} using Titanoboa..."
 
@@ -310,15 +317,15 @@ _build-iso-titanoboa $image_ref $iso_name:
 
 # Build an ISO image (generic aarch64)
 [group('Build ISO')]
-build-iso $image_ref=("ghcr.io/razorfinos-org/" + image_name + ":latest"): (_build-iso-titanoboa image_ref (image_name + "-live-aarch64.iso"))
+build-iso $image_ref=("ghcr.io/razorfinos-org/" + image_name + ":testing"): (_build-iso-titanoboa (image_ref) (image_name + "-live-aarch64.iso"))
 
 # Build an ISO image for RPi5
 [group('Build ISO')]
-build-iso-rpi5 $image_ref=("ghcr.io/razorfinos-org/" + image_name + "-rpi5:latest"): (_build-iso-titanoboa image_ref (image_name + "-rpi5-live-aarch64.iso"))
+build-iso-rpi5 $image_ref=("ghcr.io/razorfinos-org/" + image_name + "-rpi5:testing"): (_build-iso-titanoboa (image_ref) (image_name + "-rpi5-live-aarch64.iso"))
 
 # Build an ISO image for Rockchip
 [group('Build ISO')]
-build-iso-rockchip $image_ref=("ghcr.io/razorfinos-org/" + image_name + "-rockchip:latest"): (_build-iso-titanoboa image_ref (image_name + "-rockchip-live-aarch64.iso"))
+build-iso-rockchip $image_ref=("ghcr.io/razorfinos-org/" + image_name + "-rockchip:testing"): (_build-iso-titanoboa (image_ref) (image_name + "-rockchip-live-aarch64.iso"))
 
 # Run a virtual machine from an ISO
 [group('Run Virtual Machine')]
@@ -438,6 +445,12 @@ spawn-vm rebuild="0" type="qcow2" ram="6G":
     #!/usr/bin/env bash
 
     set -euo pipefail
+
+    if [[ "$(uname)" == "Darwin" ]]; then
+        echo "ERROR: systemd-vmspawn is Linux-only."
+        echo "Use 'just run-vm-qcow2' or 'just open-utm' on macOS instead."
+        exit 1
+    fi
 
     [ "{{ rebuild }}" -eq 1 ] && echo "Rebuilding the ISO" && just build-vm {{ rebuild }} {{ type }}
 
