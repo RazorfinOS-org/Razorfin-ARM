@@ -34,6 +34,7 @@ Environment variables:
 Prerequisites:
     - Run 'just build-qcow2' first to generate the QCOW2 image
     - UTM must be installed on macOS to open the resulting .utm bundle
+    - The generated UTM bundle defaults to Shared networking with an Intel E1000 NIC
 EOF
 	exit 0
 }

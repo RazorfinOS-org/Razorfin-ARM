@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck disable=SC1091
+source /usr/libexec/razorfin-steam-arm64-common
+
+usage() {
+    cat <<'EOF'
+Usage:
+  razorfin-proton-arm64-run --appid APPID --exe /path/to/game.exe [--compatdata PATH] [--proton PATH] [-- ARG...]
+  razorfin-proton-arm64-run --status
+
+Examples:
+  razorfin-proton-arm64-run --status
+  razorfin-proton-arm64-run --appid 480 --exe "$HOME/Games/Test/Game.exe"
+EOF
+}
+
+if [[ "${1:-}" == "--status" ]]; then
+    razorfin_print_arm64_status
+    exit 0
+fi
+
+appid=""
+compatdata=""
+game_exe=""
+proton_dir="${PROTONPATH:-${RAZORFIN_PROTON_ARM64_PATH:-}}"
+declare -a game_args=()
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --appid)
+            appid="${2:-}"
+            shift 2
+            ;;
+        --compatdata)
+            compatdata="${2:-}"
+            shift 2
+            ;;
+        --exe)
+            game_exe="${2:-}"
+            shift 2
+            ;;
+        --proton)
+            proton_dir="${2:-}"
+            shift 2
+            ;;
+        --)
+            shift
+            game_args=("$@")
+            break
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            if [[ -z "${game_exe}" ]]; then
+                game_exe="$1"
+            else
+                game_args+=("$1")
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "${appid}" || -z "${game_exe}" ]]; then
+    usage >&2
+    exit 64
+fi
+
+if [[ ! -e "${game_exe}" ]]; then
+    echo "ERROR: Game executable not found: ${game_exe}" >&2
+    exit 1
+fi
+
+if [[ -z "${compatdata}" ]]; then
+    compatdata="$(razorfin_default_compatdata "${appid}")"
+fi
+
+mkdir -p "$(razorfin_steam_home)" "${compatdata}"
+
+if [[ -z "${proton_dir}" ]]; then
+    if ! proton_dir="$(razorfin_resolve_proton_dir)"; then
+        echo "ERROR: Unable to find a Proton ARM64 tool." >&2
+        echo "Expected Steam app ${RAZORFIN_PROTON_ARM64_APPID} (${RAZORFIN_PROTON_ARM64_DISPLAY_NAME})" >&2
+        echo "or a staged tool at ${RAZORFIN_PROTON_ARM64_SYSTEM_DIR}" >&2
+        exit 1
+    fi
+fi
+
+if [[ ! -x "${proton_dir}/proton" ]]; then
+    echo "ERROR: Proton launcher missing at ${proton_dir}/proton" >&2
+    exit 1
+fi
+
+if ! runtime_entry="$(razorfin_runtime_entry)"; then
+    echo "ERROR: ARM64 Steam Runtime entry point not found in $(razorfin_runtime_dir)" >&2
+    exit 1
+fi
+
+game_exe="$(realpath "${game_exe}")"
+game_dir="$(dirname "${game_exe}")"
+
+export STEAM_COMPAT_CLIENT_INSTALL_PATH="$(razorfin_steam_home)"
+export STEAM_COMPAT_DATA_PATH="${compatdata}"
+export STEAM_COMPAT_APP_ID="${appid}"
+export STEAM_COMPAT_TOOL_PATHS="${proton_dir}:$(razorfin_runtime_dir)"
+export STEAM_COMPAT_INSTALL_PATH="${game_dir}"
+export STEAM_COMPAT_LIBRARY_PATHS="$(razorfin_steam_home)/steamapps"
+export SteamAppId="${appid}"
+export SteamGameId="${appid}"
+export PRESSURE_VESSEL_FILESYSTEMS_RW="${STEAM_COMPAT_DATA_PATH}:${game_dir}"
+export PROTON_LOG_DIR="${PROTON_LOG_DIR:-${HOME}}"
+
+exec "${runtime_entry}" --verb=waitforexitandrun -- "${proton_dir}/proton" waitforexitandrun "${game_exe}" "${game_args[@]}"

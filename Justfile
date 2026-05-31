@@ -195,7 +195,8 @@ _build-bib $target_image $tag $type $config:
 
     args="--type ${type} "
     args+="--use-librepo=True "
-    args+="--rootfs=btrfs"
+    args+="--config /config.toml "
+    args+="--rootfs=ext4"
 
     mkdir -p "$(pwd)/output"
 
@@ -204,9 +205,12 @@ _build-bib $target_image $tag $type $config:
         # Podman Machine mounts /Users, so ensure we're writing there or use a
         # staging dir under $HOME if the cwd isn't visible to the VM
         OUTPUT_DIR="$(pwd)/output"
+        CONFIG_PATH="$(pwd)/${config}"
         if ! podman machine ssh -- "test -d '$(pwd)'" 2>/dev/null; then
             OUTPUT_DIR="${HOME}/razorfin-arm-output"
+            CONFIG_PATH="${HOME}/razorfin-arm-disk.toml"
             mkdir -p "${OUTPUT_DIR}"
+            cp "$(pwd)/${config}" "${CONFIG_PATH}"
             echo "NOTE: Working directory not mounted in Podman Machine VM."
             echo "Output will be staged at ${OUTPUT_DIR} and copied to ./output/"
         fi
@@ -216,6 +220,7 @@ _build-bib $target_image $tag $type $config:
           --privileged \
           --pull=newer \
           --security-opt label=type:unconfined_t \
+          -v "${CONFIG_PATH}":/config.toml:ro \
           -v "${OUTPUT_DIR}":/output \
           -v /var/lib/containers/storage:/var/lib/containers/storage \
           "${bib_image}" \

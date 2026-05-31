@@ -17,7 +17,9 @@ Razorfin ARM is an aarch64 port of [Razorfin](https://github.com/RazorfinOS-org/
 
 - **COSMIC Desktop** — System76's modern, Rust-based desktop environment
 - **FEX-Emu** — x86/x86-64 binary translator with Vulkan/OpenGL thunks for near-native GPU performance
-- **Steam** — Runs via FEX-Emu with the `razorfin-steam` launcher
+- **Steam Runtime 4 (ARM64)** — Staged in the image for Valve-style ARM64 Proton launches
+- **ARM64 Proton harness** — `razorfin-proton-arm64-run` and `razorfin-steam-arm64` wire up the reference path
+- **Steam fallback** — Legacy `razorfin-steam` launcher still runs Steam via FEX-Emu
 - **Mesa/Vulkan** — Native ARM64 GPU drivers
 - **Gaming tools** — Gamescope, MangoHud, GameMode (where available for aarch64)
 - **Performance tuning** — [Bazzite](https://bazzite.gg/)-matched sysctl values, FEX thunks, per-game [AppConfig](https://github.com/FEX-Emu/AppConfig) profiles
@@ -78,6 +80,43 @@ FEXBash uname -m  # Should output: x86_64
 ```
 
 FEX-Emu thunks forward Vulkan and OpenGL calls to native ARM64 Mesa drivers, providing near-native GPU performance for games.
+
+## Valve-Style ARM64 Proton Path
+
+Razorfin now stages Valve's public **Steam Linux Runtime 4 ARM64** artifact in the image and installs two reference launchers:
+
+```bash
+# Inspect the staged ARM64 runtime and resolve any Proton ARM64 tool
+razorfin-steam-arm64 status
+
+# Inspect the lower-level launch harness
+razorfin-proton-arm64-run --status
+```
+
+The desktop launcher currently uses the proven legacy Steam-on-FEX path for login and setup, so users can sign in and install the free `Proton 11.0 (ARM64)` tool without waiting on a native ARM Steam client.
+
+Once a user has logged into Steam and installed **Proton 11.0 (ARM64)**, or if a local ARM64 Proton build has been staged in the system tool directory, a Windows executable can be launched directly through the ARM64 runtime harness:
+
+```bash
+razorfin-proton-arm64-run --appid 480 --exe "$HOME/Games/Test/Game.exe"
+```
+
+The legacy `razorfin-steam` launcher remains available as a fallback while the ARM64-native stack matures.
+
+### Building And Testing In UTM
+
+The image build stages the public ARM64 Steam Runtime and the ARM64 launch harness, but **does not log into Steam or preinstall Proton**. Users install the free `Proton 11.0 (ARM64)` tool after boot by opening Steam and signing in.
+
+Once the container image builds, the repo already includes the macOS/UTM path:
+
+```bash
+just build
+just build-qcow2
+just build-utm
+just open-utm
+```
+
+The generated UTM bundle defaults to **Shared** networking with an **Intel E1000** NIC because that is currently more reliable than the VirtIO NIC for IPv4 connectivity on this setup.
 
 ## Performance Tuning
 
@@ -202,6 +241,8 @@ Run `just` with no arguments to see all available recipes.
 ## Contributing
 
 See the [release runbook](docs/release-runbook.md) for details on the CI/CD pipeline, emergency hotfix procedures, and rollback operations.
+
+For the ARM gaming stack's forward-looking design, see the [Valve-style ARM64 Proton reference architecture](docs/valve-arm64-reference-architecture.md).
 
 ## Community
 

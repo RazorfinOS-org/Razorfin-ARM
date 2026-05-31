@@ -1,2 +1,10 @@
 # Bootc Image Builder (BIB) disk configuration
 # See: https://github.com/osbuild/bootc-image-builder
+
+[[customizations.filesystem]]
+mountpoint = "/"
+minsize = "28 GiB"
+
+[[customizations.filesystem]]
+mountpoint = "/boot"
+minsize = "1 GiB"

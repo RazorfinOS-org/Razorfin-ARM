@@ -59,13 +59,13 @@
 		<false/>
 	</dict>
 	<key>Network</key>
-	<array>
-		<dict>
-			<key>Hardware</key>
-			<string>virtio-net-pci</string>
-			<key>IsolateFromHost</key>
-			<false/>
-			<key>MacAddress</key>
+		<array>
+			<dict>
+				<key>Hardware</key>
+				<string>e1000-82545em</string>
+				<key>IsolateFromHost</key>
+				<false/>
+				<key>MacAddress</key>
 			<string>PLACEHOLDER_MAC</string>
 			<key>Mode</key>
 			<string>Shared</string>

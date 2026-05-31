@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# shellcheck disable=SC1091
+source /usr/libexec/razorfin-steam-arm64-common
+
+show_install_hint() {
+    cat <<EOF
+Queue these free Steam tools once Steam can see them:
+  - Steam Linux Runtime 4 - Arm64 (appid ${RAZORFIN_STEAMRT4_ARM64_APPID})
+  - ${RAZORFIN_PROTON_ARM64_DISPLAY_NAME} (appid ${RAZORFIN_PROTON_ARM64_APPID})
+
+If you already have a Proton ARM64 build, place it at:
+  ${RAZORFIN_PROTON_ARM64_SYSTEM_DIR}
+EOF
+}
+
+queue_steam_uri() {
+    local appid="${1:?appid required}"
+    local uri="steam://install/${appid}"
+
+    if command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "${uri}" >/dev/null 2>&1 || true
+    fi
+
+    if command -v razorfin-steam >/dev/null 2>&1; then
+        razorfin-steam "${uri}" || true
+    fi
+}
+
+subcommand="${1:-launch}"
+case "${subcommand}" in
+    status)
+        razorfin_print_arm64_status
+        ;;
+    install-tools)
+        show_install_hint
+        queue_steam_uri "${RAZORFIN_STEAMRT4_ARM64_APPID}"
+        queue_steam_uri "${RAZORFIN_PROTON_ARM64_APPID}"
+        ;;
+    launch)
+        shift || true
+        if [[ "${RAZORFIN_USE_NATIVE_STEAM:-0}" == "1" ]] && native_steam="$(razorfin_resolve_native_steam 2>/dev/null)"; then
+            exec "${native_steam}" "$@"
+        fi
+
+        # Today the reliable way to get a user logged into Steam and install the
+        # free ARM64 Proton tool is still the legacy Steam-on-FEX launcher.
+        # Keep native Steam as an opt-in path until it is proven to work.
+        exec razorfin-steam "$@"
+        ;;
+    *)
+        if [[ "${RAZORFIN_USE_NATIVE_STEAM:-0}" == "1" ]] && native_steam="$(razorfin_resolve_native_steam 2>/dev/null)"; then
+            exec "${native_steam}" "$@"
+        fi
+
+        echo "Unknown subcommand: ${subcommand}" >&2
+        echo "Try: razorfin-steam-arm64 status" >&2
+        exit 64
+        ;;
+esac

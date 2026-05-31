@@ -140,7 +140,101 @@ fi
 dnf5 install -y gamemode
 
 # =============================================================================
-# STEAM INTEGRATION
+# VALVE-STYLE ARM64 PROTON REFERENCE STACK
+# =============================================================================
+# Stage the public ARM64 Steam Runtime in the image and install launch helpers
+# that can drive an ARM64 Proton tool once the user has one available.
+
+source /ctx/build/gaming/steam-arm64.conf
+
+STEAM_ARM_BASE="${RAZORFIN_STEAM_ARM_BASE}"
+STEAM_ARM_RUNTIME_ROOT="${STEAM_ARM_BASE}/runtime"
+STEAM_ARM_TOOLS_ROOT="${STEAM_ARM_BASE}/compatibilitytools.d"
+STEAM_ARM_MANIFEST_ROOT="${STEAM_ARM_BASE}/manifests"
+STEAM_ARM_RUNTIME_DIR="${STEAM_ARM_RUNTIME_ROOT}/${RAZORFIN_STEAMRT4_ARM64_NAME}"
+
+mkdir -p \
+    "${STEAM_ARM_RUNTIME_ROOT}" \
+    "${STEAM_ARM_TOOLS_ROOT}" \
+    "${STEAM_ARM_MANIFEST_ROOT}"
+
+install -Dm644 /ctx/build/gaming/steam-arm64.conf "${STEAM_ARM_MANIFEST_ROOT}/steam-arm64.conf"
+
+STEAMRT_VERSION="$(curl -fsSL "${RAZORFIN_STEAMRT4_ARM64_VERSION_URL}" | tr -d '\n')"
+echo "${STEAMRT_VERSION}" > "${STEAM_ARM_MANIFEST_ROOT}/steamrt4-arm64.version"
+
+TMPDIR_STEAMRT="$(mktemp -d)"
+curl -fsSL "${RAZORFIN_STEAMRT4_ARM64_TARBALL_URL}" -o "${TMPDIR_STEAMRT}/${RAZORFIN_STEAMRT4_ARM64_TARBALL}"
+curl -fsSL "${RAZORFIN_STEAMRT4_ARM64_SHA256_URL}" -o "${TMPDIR_STEAMRT}/SHA256SUMS"
+
+(
+    cd "${TMPDIR_STEAMRT}"
+    sha256sum -c --ignore-missing SHA256SUMS
+)
+
+tar -xJf "${TMPDIR_STEAMRT}/${RAZORFIN_STEAMRT4_ARM64_TARBALL}" -C "${TMPDIR_STEAMRT}"
+EXTRACTED_RUNTIME="$(find "${TMPDIR_STEAMRT}" -mindepth 1 -maxdepth 1 -type d | head -1)"
+if [[ -z "${EXTRACTED_RUNTIME}" ]]; then
+    echo "ERROR: ARM64 Steam Runtime archive did not unpack into a directory"
+    exit 1
+fi
+
+rm -rf "${STEAM_ARM_RUNTIME_DIR}"
+mv "${EXTRACTED_RUNTIME}" "${STEAM_ARM_RUNTIME_DIR}"
+rm -rf "${TMPDIR_STEAMRT}"
+
+cat > "${STEAM_ARM_MANIFEST_ROOT}/reference-stack.json" <<EOF
+{
+  "runtime": {
+    "appid": "${RAZORFIN_STEAMRT4_ARM64_APPID}",
+    "name": "${RAZORFIN_STEAMRT4_ARM64_NAME}",
+    "version": "${STEAMRT_VERSION}",
+    "source": "${RAZORFIN_STEAMRT4_ARM64_BASE_URL}"
+  },
+  "proton": {
+    "appid": "${RAZORFIN_PROTON_ARM64_APPID}",
+    "display_name": "${RAZORFIN_PROTON_ARM64_DISPLAY_NAME}",
+    "system_dir": "${RAZORFIN_PROTON_ARM64_SYSTEM_DIR}"
+  }
+}
+EOF
+
+mkdir -p "${RAZORFIN_PROTON_ARM64_SYSTEM_DIR}"
+install -Dm644 /ctx/build/gaming/proton-arm64-placeholder.md "${RAZORFIN_PROTON_ARM64_SYSTEM_DIR}/README.md"
+
+cat > "${STEAM_ARM_MANIFEST_ROOT}/proton-arm64.json" <<EOF
+{
+  "appid": "${RAZORFIN_PROTON_ARM64_APPID}",
+  "display_name": "${RAZORFIN_PROTON_ARM64_DISPLAY_NAME}",
+  "source": "runtime-user-install",
+  "target_dir": "${RAZORFIN_PROTON_ARM64_SYSTEM_DIR}"
+}
+EOF
+
+install -Dm755 /ctx/build/gaming/razorfin-steam-arm64-common.sh /usr/libexec/razorfin-steam-arm64-common
+install -Dm755 /ctx/build/gaming/razorfin-proton-arm64-run /usr/bin/razorfin-proton-arm64-run
+install -Dm755 /ctx/build/gaming/razorfin-steam-arm64 /usr/bin/razorfin-steam-arm64
+
+cat > /usr/share/applications/razorfin-steam-arm64.desktop << 'DESKTOPEOF'
+[Desktop Entry]
+Name=Steam (ARM64 Setup)
+Comment=Launch Steam and set up Razorfin's ARM64 Proton runtime
+Exec=razorfin-steam-arm64 launch
+Icon=steam
+Terminal=false
+Type=Application
+Categories=Game;
+Keywords=gaming;valve;steam;proton;arm64;
+DESKTOPEOF
+
+echo "Staged Steam Linux Runtime 4 ARM64 version: ${STEAMRT_VERSION}"
+echo "Installed ARM64 Proton reference launchers:"
+echo "  - razorfin-steam-arm64"
+echo "  - razorfin-proton-arm64-run"
+echo "Reserved Proton 11 ARM64 system path: ${RAZORFIN_PROTON_ARM64_SYSTEM_DIR}"
+
+# =============================================================================
+# LEGACY STEAM INTEGRATION
 # =============================================================================
 # Steam is an x86-64 application. FEX-Emu translates it for ARM64.
 # We provide a wrapper script and .desktop file for easy launching.
