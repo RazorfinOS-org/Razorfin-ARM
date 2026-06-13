@@ -24,7 +24,7 @@ case "${BOARD_TARGET}" in
     rpi5)
         echo "============================================================"
         echo "WARNING: Raspberry Pi 5 support is EXPERIMENTAL"
-        echo "Fedora 43 mainline kernel has limited RPi 5 support."
+        echo "Fedora 44 mainline kernel has limited RPi 5 support."
         echo "Some peripherals (USB, GPIO) may not work correctly."
         echo "============================================================"
 
@@ -55,7 +55,7 @@ case "${BOARD_TARGET}" in
             linux-firmware
 
         # Rockchip RK3588 boards (Rock 5B, Orange Pi 5) use mainline device trees
-        # No additional firmware packages needed for basic boot in Fedora 43
+        # No additional firmware packages needed for basic boot in Fedora 44
         ;;
 
     *)

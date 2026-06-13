@@ -34,7 +34,7 @@ env:
   IMAGE_NAME: "${{ github.event.repository.name }}"
   IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"
   DEFAULT_TAG: "testing"
-  BASE_IMAGE: "quay.io/fedora-ostree-desktops/cosmic-atomic:43"
+  BASE_IMAGE: "quay.io/fedora-ostree-desktops/cosmic-atomic:44"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}

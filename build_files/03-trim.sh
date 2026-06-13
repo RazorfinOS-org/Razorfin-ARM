@@ -9,7 +9,7 @@ set -xeuo pipefail
 # that are clearly unnecessary and won't break COSMIC or its dependencies.
 #
 # To audit the base image:
-#   podman run --rm quay.io/fedora-ostree-desktops/cosmic-atomic:43 rpm -qa | sort
+#   podman run --rm quay.io/fedora-ostree-desktops/cosmic-atomic:44 rpm -qa | sort
 
 # Remove LibreOffice if present (users can install via Flatpak)
 dnf5 remove -y libreoffice* 2>/dev/null || true
