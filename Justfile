@@ -1,7 +1,7 @@
 export image_name := env("IMAGE_NAME", "razorfin-arm")
 export default_tag := env("DEFAULT_TAG", "latest")
 export bib_image := env("BIB_IMAGE", "quay.io/centos-bootc/bootc-image-builder:latest")
-export default_base_image := env("BASE_IMAGE", "quay.io/fedora-ostree-desktops/cosmic-atomic:43")
+export default_base_image := env("BASE_IMAGE", "quay.io/fedora-ostree-desktops/cosmic-atomic:44")
 export titanoboa_image := env("TITANOBOA_IMAGE", "ghcr.io/ublue-os/titanoboa:latest")
 export default_board_target := env("BOARD_TARGET", "generic")
 
@@ -111,7 +111,7 @@ build $target_image=image_name $tag=default_tag $base_image=default_base_image $
 build-dx $target_image=("localhost/" + image_name + "-dx") $tag=default_tag $board_target=default_board_target:
     #!/usr/bin/env bash
     BUILD_ARGS=()
-    BUILD_ARGS+=("--build-arg" "BASE_IMAGE=${BASE_IMAGE:-quay.io/fedora-ostree-desktops/cosmic-atomic:43}")
+    BUILD_ARGS+=("--build-arg" "BASE_IMAGE=${BASE_IMAGE:-quay.io/fedora-ostree-desktops/cosmic-atomic:44}")
     BUILD_ARGS+=("--build-arg" "BOARD_TARGET=${board_target}")
     BUILD_ARGS+=("--build-arg" "DX_VARIANT=true")
     if [[ -z "$(git status -s)" ]]; then
@@ -128,7 +128,7 @@ build-dx $target_image=("localhost/" + image_name + "-dx") $tag=default_tag $boa
 build-rpi5 $target_image=("localhost/" + image_name + "-rpi5") $tag=default_tag:
     #!/usr/bin/env bash
     BUILD_ARGS=()
-    BUILD_ARGS+=("--build-arg" "BASE_IMAGE=${BASE_IMAGE:-quay.io/fedora-ostree-desktops/cosmic-atomic:43}")
+    BUILD_ARGS+=("--build-arg" "BASE_IMAGE=${BASE_IMAGE:-quay.io/fedora-ostree-desktops/cosmic-atomic:44}")
     BUILD_ARGS+=("--build-arg" "BOARD_TARGET=rpi5")
     BUILD_ARGS+=("--build-arg" "DX_VARIANT=false")
     if [[ -z "$(git status -s)" ]]; then
@@ -145,7 +145,7 @@ build-rpi5 $target_image=("localhost/" + image_name + "-rpi5") $tag=default_tag:
 build-rockchip $target_image=("localhost/" + image_name + "-rockchip") $tag=default_tag:
     #!/usr/bin/env bash
     BUILD_ARGS=()
-    BUILD_ARGS+=("--build-arg" "BASE_IMAGE=${BASE_IMAGE:-quay.io/fedora-ostree-desktops/cosmic-atomic:43}")
+    BUILD_ARGS+=("--build-arg" "BASE_IMAGE=${BASE_IMAGE:-quay.io/fedora-ostree-desktops/cosmic-atomic:44}")
     BUILD_ARGS+=("--build-arg" "BOARD_TARGET=rockchip")
     BUILD_ARGS+=("--build-arg" "DX_VARIANT=false")
     if [[ -z "$(git status -s)" ]]; then

@@ -1,4 +1,4 @@
-ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/cosmic-atomic:43"
+ARG BASE_IMAGE="quay.io/fedora-ostree-desktops/cosmic-atomic:44"
 ARG BOARD_TARGET="generic"
 ARG DX_VARIANT="false"
 

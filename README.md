@@ -2,7 +2,7 @@
 
 [![build](https://github.com/RazorfinOS-org/Razorfin-ARM/actions/workflows/build.yml/badge.svg)](https://github.com/RazorfinOS-org/Razorfin-ARM/actions/workflows/build.yml)
 
-Razorfin ARM is an aarch64 port of [Razorfin](https://github.com/RazorfinOS-org/Razorfin), built on [Fedora COSMIC Atomic](https://fedoraproject.org/atomic-desktops/cosmic/) 43. It combines the [COSMIC](https://system76.com/cosmic) desktop environment with [FEX-Emu](https://fex-emu.com/) for x86/x86-64 game and application support on ARM hardware.
+Razorfin ARM is an aarch64 port of [Razorfin](https://github.com/RazorfinOS-org/Razorfin), built on [Fedora COSMIC Atomic](https://fedoraproject.org/atomic-desktops/cosmic/) 44. It combines the [COSMIC](https://system76.com/cosmic) desktop environment with [FEX-Emu](https://fex-emu.com/) for x86/x86-64 game and application support on ARM hardware.
 
 ## Variants
 
@@ -232,7 +232,7 @@ Run `just` with no arguments to see all available recipes.
 
 | Feature | x86 Razorfin | Razorfin ARM |
 |---------|-------------|--------------|
-| Base image | Bazzite (Universal Blue) | Fedora COSMIC Atomic 43 |
+| Base image | Bazzite (Universal Blue) | Fedora COSMIC Atomic 44 |
 | Architecture | x86_64 | aarch64 |
 | Gaming | Native x86 + Proton | FEX-Emu x86 translation + Proton |
 | NVIDIA variants | Yes | No (ARM NVIDIA is rare) |

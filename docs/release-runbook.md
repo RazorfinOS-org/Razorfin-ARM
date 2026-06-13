@@ -35,7 +35,7 @@ schedule ──────┘    (skips build if no upstream Fedora COSMIC Atom
 :latest  -->  :stable, :stable.YYYYMMDD
 ```
 
-The build workflow runs a **check** job before building. For scheduled runs (daily at 04:40 UTC), it compares the upstream Fedora COSMIC Atomic `:43` digest against the `org.opencontainers.image.base.digest` label on the current `:testing` image. If the base image is unchanged, the build is skipped. Push, pull request, and manual dispatch events always build.
+The build workflow runs a **check** job before building. For scheduled runs (daily at 04:40 UTC), it compares the upstream Fedora COSMIC Atomic `:44` digest against the `org.opencontainers.image.base.digest` label on the current `:testing` image. If the base image is unchanged, the build is skipped. Push, pull request, and manual dispatch events always build.
 
 On Tuesdays, the stable promotion runs **before** the daily promotion. This ensures that `stable` receives the week-old `latest` image rather than the image just promoted from `testing`.
 
@@ -49,7 +49,7 @@ All promotions apply to every variant in the build matrix:
 ## 6. Build Infrastructure
 
 - **Runner**: `ubuntu-24.04-arm` (native aarch64 GitHub Actions runner)
-- **Base image**: `quay.io/fedora-ostree-desktops/cosmic-atomic:43`
+- **Base image**: `quay.io/fedora-ostree-desktops/cosmic-atomic:44`
 - **No rechunk**: v1 skips the `ublue-os/legacy-rechunk` step (no aarch64 rechunk image available). Images are pushed directly via buildah/skopeo.
 - **Signing**: All images are signed with Cosign using the `COSIGN_PRIVATE_KEY` repository secret.
 
